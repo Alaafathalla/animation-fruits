@@ -1,0 +1,17 @@
+{
+  "name": "cloth-3d-showcase",
+  "version": "1.0.0",
+  "description": "Professional 3D Interactive Clothing Showcase powered by Three.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
