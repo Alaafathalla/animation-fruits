@@ -1,13 +1,12 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { spawnFruit } from './fruits.js';
+import { spawnFruit, FRUIT_CATALOG } from './fruits.js';
 import { createPhysics, makeBody } from './physics.js';
 import { createKnife } from './knife.js';
 import { createSlicer } from './slicer.js';
 import { createStudio } from './studio.js';
 
 // ── Loader ────────────────────────────────────────────────────────
-const loaderEl = document.getElementById('loader');
+const loaderEl   = document.getElementById('loader');
 const loaderFill = document.getElementById('loader-fill');
 const loaderText = document.getElementById('loader-text');
 function setP(p, t) { loaderFill.style.width = p + '%'; loaderText.textContent = t; }
@@ -20,173 +19,233 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 setP(10, 'Renderer…');
 
 // ── Scene ─────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070c16);
-scene.fog = new THREE.FogExp2(0x070c16, 0.028);
+scene.background = new THREE.Color(0xe8e8e6);
 
 // ── Camera ────────────────────────────────────────────────────────
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 1.5, 10.5);
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 11);
+camera.lookAt(0, 0, 0);
 
-// ── Orbit Controls ────────────────────────────────────────────────
-const orbit = new OrbitControls(camera, canvas);
-orbit.enableDamping = true;
-orbit.dampingFactor = 0.07;
-orbit.enablePan = false;
-orbit.minDistance = 3;
-orbit.maxDistance = 18;
-orbit.maxPolarAngle = Math.PI * 0.80;
-orbit.target.set(0, 0, 0);
 setP(20, 'Lighting…');
 
-// ── Lighting ──────────────────────────────────────────────────────
-const keyLight = new THREE.DirectionalLight(0xfff8f0, 4.5);
-keyLight.position.set(4, 8, 5);
+// ── Lighting — bright studio ──────────────────────────────────────
+// Strong top-left key
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
+keyLight.position.set(-4, 8, 6);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
 keyLight.shadow.camera.near = 0.5;
-keyLight.shadow.camera.far = 40;
-keyLight.shadow.camera.left = -8;
-keyLight.shadow.camera.right = 8;
-keyLight.shadow.camera.top = 8;
-keyLight.shadow.camera.bottom = -8;
-keyLight.shadow.bias = -0.001;
+keyLight.shadow.camera.far  = 40;
+keyLight.shadow.camera.left   = -9;
+keyLight.shadow.camera.right  =  9;
+keyLight.shadow.camera.top    =  9;
+keyLight.shadow.camera.bottom = -9;
+keyLight.shadow.bias = -0.0005;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xb0d8ff, 1.6);
-fillLight.position.set(-5, 3, -3);
+// Soft fill from the right
+const fillLight = new THREE.DirectionalLight(0xddeeff, 1.8);
+fillLight.position.set(6, 4, 2);
 scene.add(fillLight);
 
-const rimLight = new THREE.DirectionalLight(0xffeecc, 2.0);
-rimLight.position.set(0, 5, -7);
+// Rim from behind
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
+rimLight.position.set(0, 3, -8);
 scene.add(rimLight);
 
-scene.add(new THREE.AmbientLight(0x14121e, 3));
-scene.add(new THREE.HemisphereLight(0x1a1030, 0x080808, 1.0));
+// Ambient — warm neutral
+scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd0cfc8, 0.9));
 
-const spot = new THREE.SpotLight(0xffffff, 6, 20, Math.PI * 0.22, 0.5, 1.5);
-spot.position.set(0, 10, 0);
-scene.add(spot);
-scene.add(spot.target);
 setP(32, 'Environment…');
 
-// ── Floor ─────────────────────────────────────────────────────────
-const floorMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(22, 22),
-  new THREE.MeshStandardMaterial({ color: 0x111018, roughness: 0.95, metalness: 0.1 })
-);
-floorMesh.rotation.x = -Math.PI / 2;
-floorMesh.position.y = -3.2;
-floorMesh.receiveShadow = true;
-scene.add(floorMesh);
-
+// ── Studio / floor ────────────────────────────────────────────────
 const studio = createStudio(scene);
 
-const glowMat = new THREE.MeshBasicMaterial({ color: 0xe8c96a, transparent: true, opacity: 0.04, depthWrite: false });
-const glowMesh = new THREE.Mesh(new THREE.CircleGeometry(3.5, 64), glowMat);
-glowMesh.rotation.x = -Math.PI / 2;
-glowMesh.position.y = -3.19;
-scene.add(glowMesh);
-
-const grid = new THREE.GridHelper(22, 22, 0x1a1830, 0x1a1830);
-grid.position.y = -3.19;
-scene.add(grid);
-
-setP(44, 'Physics…');
+setP(48, 'Physics…');
 
 // ── Physics ───────────────────────────────────────────────────────
 const physics = createPhysics();
-const simState = { gravity: 9.8, bounce: 0.45, friction: 0.98, throwSpeed: 8, spin: 3, spread: 1 };
 
-setP(56, 'Knife…');
+// Jelly softness setting (0 = rigid, 1 = very soft)
+let jellyAmount = 0.7;   // default "Soft"
 
-// ── Knife ─────────────────────────────────────────────────────────
+setP(60, 'Knife…');
+
+// ── Knife (hidden until "Knife" mode) ────────────────────────────
 const knife = createKnife(scene);
 
-setP(64, 'Slicer…');
+setP(70, 'Fruits…');
 
-// ── Score ─────────────────────────────────────────────────────────
-let score = 0, combo = 1, comboTimer = 0;
-const scoreEl = document.getElementById('score');
-const comboBox = document.getElementById('combo-box');
-const comboTxt = document.getElementById('combo-text');
+// ── Fruit bodies ──────────────────────────────────────────────────
+const bodies = [];   // { body, fruitData, labelEl, index }
 
-function addScore(worldPos) {
-  score += 10 * combo;
-  if (scoreEl) scoreEl.textContent = score;
-  combo++;
-  comboTimer = 1.8;
-  if (comboTxt) comboTxt.textContent = `×${combo}`;
-  if (comboBox) { comboBox.classList.add('show', 'pop'); setTimeout(() => comboBox.classList.remove('pop'), 200); }
-  // Floating text
-  const div = document.createElement('div');
-  div.className = 'score-pop';
-  div.textContent = `+${10 * (combo - 1)}`;
-  const proj = worldPos.clone().project(camera);
-  const r = canvas.getBoundingClientRect();
-  div.style.left = ((proj.x * 0.5 + 0.5) * r.width + r.left) + 'px';
-  div.style.top = ((-proj.y * 0.5 + 0.5) * r.height + r.top) + 'px';
-  document.body.appendChild(div);
-  setTimeout(() => div.remove(), 1100);
-}
-
-// ── Slicer ────────────────────────────────────────────────────────
-const slicer = createSlicer(canvas, camera, scene, physics, knife, addScore);
-
-// ── Fruit helpers ─────────────────────────────────────────────────
-function spawnFruitAt(type, pos, vel) {
+function spawnFruitAt(type, pos, vel, spin) {
   const fd = spawnFruit(type, pos);
   scene.add(fd.group);
-  const spin = new THREE.Vector3(
-    (Math.random() - 0.5) * simState.spin,
-    (Math.random() - 0.5) * simState.spin,
-    (Math.random() - 0.5) * simState.spin
+  const spinVec = spin || new THREE.Vector3(
+    (Math.random() - 0.5) * 2.5,
+    (Math.random() - 0.5) * 2.5,
+    (Math.random() - 0.5) * 2.5
   );
-  const body = makeBody(fd, vel || new THREE.Vector3(), spin, simState.bounce);
+  const body = makeBody(fd, vel || new THREE.Vector3(), spinVec, 0.55);
   physics.add(body);
-  return body;
+
+  // Label pill
+  const labelEl = createLabel(fd.label);
+  const idx = bodies.filter(b => b.fruitData.type === type).length + 1;
+  labelEl.querySelector('.label-text').textContent =
+    `${fd.label} ${String(idx).padStart(2, '0')}`;
+
+  bodies.push({ body, fruitData: fd, labelEl, index: idx });
+  return { body, fruitData: fd };
+}
+
+function removeBody(entry) {
+  physics.remove(entry.body);
+  scene.remove(entry.fruitData.group);
+  if (entry.labelEl && entry.labelEl.parentNode) entry.labelEl.remove();
+  const i = bodies.indexOf(entry);
+  if (i !== -1) bodies.splice(i, 1);
 }
 
 function clearAll() {
-  physics.getBodies().forEach(b => scene.remove(b.group));
-  physics.clear();
-  score = 0; combo = 1; comboTimer = 0;
-  if (scoreEl) scoreEl.textContent = '0';
-  if (comboBox) comboBox.classList.remove('show');
+  for (const entry of [...bodies]) removeBody(entry);
 }
 
-// Starter fruits
-['watermelon', 'orange', 'apple', 'lemon'].forEach((t, i) =>
-  spawnFruitAt(t, new THREE.Vector3((i - 1.5) * 1.75, 1.8 + i * .12, 0), new THREE.Vector3())
-);
+// ── Label pills ───────────────────────────────────────────────────
+function createLabel(text) {
+  const el = document.createElement('div');
+  el.className = 'fruit-label';
+  el.innerHTML = `<span class="label-dot"></span><span class="label-text">${text}</span>`;
+  el.style.opacity = '0';
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '1'; }, 100);
+  return el;
+}
 
-setP(78, 'Wiring UI…');
+let showTags = true;
 
-// ── Drag / drop state ─────────────────────────────────────────────
-const raycaster = new THREE.Raycaster();
-const ndcMouse = new THREE.Vector2();
-const dragPlane = new THREE.Plane();
-const dragHit = new THREE.Vector3();
-let dragBody = null;
-let dragOffset = new THREE.Vector3();
-let dragDepth = 0;
-// velocity estimation for throw-on-release
-let dragPrevPos = new THREE.Vector3();
-let dragVel = new THREE.Vector3();
+function updateLabels() {
+  const rect = canvas.getBoundingClientRect();
+  for (const entry of bodies) {
+    const el = entry.labelEl;
+    if (!el) continue;
+    if (!showTags) { el.style.display = 'none'; continue; }
+    el.style.display = 'flex';
+
+    // Project fruit centre to screen
+    const wp = entry.fruitData.group.position.clone();
+    wp.y += entry.fruitData.radius * 1.1; // anchor above fruit
+    const proj = wp.project(camera);
+
+    if (proj.z > 1) { el.style.opacity = '0'; continue; }
+
+    const sx = (proj.x * 0.5 + 0.5) * rect.width  + rect.left;
+    const sy = (-proj.y * 0.5 + 0.5) * rect.height + rect.top;
+
+    el.style.left    = sx + 'px';
+    el.style.top     = sy + 'px';
+    el.style.opacity = entry.body.sleeping ? '0.9' : '0.75';
+    el.style.transform = 'translateX(-50%)';
+  }
+}
+
+// ── Slicer (knife drag) ───────────────────────────────────────────
+const slicer = createSlicer(canvas, camera, scene, physics, knife, onSlice, () => {});
+
+function onSlice(worldPos, fruitType) {
+  // small juice flash — no score UI needed
+}
+
+setP(80, 'Layout…');
+
+// ── World-space helper: visible half-width at z=0 for current camera ──
+function visibleWidth() {
+  // half-width in world units at z=0 (camera at z=11, looking at origin)
+  const fovRad = THREE.MathUtils.degToRad(camera.fov);
+  const dist   = camera.position.z;        // 11
+  const halfH  = Math.tan(fovRad / 2) * dist;
+  const halfW  = halfH * camera.aspect;
+  return { halfW, halfH };
+}
+
+// ── Initial fruit layout — centred in the visible viewport ───────
+function spawnInitialFruits() {
+  const { halfW, halfH } = visibleWidth();
+  // usable area: keep fruits within 85% of half-width, 70% of half-height
+  const W = halfW * 0.82;   // ≈ 3.9 at default camera
+  const H = halfH * 0.68;   // ≈ 2.6
+
+  // --- fixed 6-fruit layout scaled to viewport ---
+  // Kiwi — left-centre, large disc (sits still immediately)
+  spawnFruitAt('kiwi',
+    new THREE.Vector3(-W * 0.70, -H * 0.05, 0),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, 0)
+  );
+
+  // Strawberry 01 — centre-left, slightly high
+  spawnFruitAt('strawberry',
+    new THREE.Vector3(-W * 0.14, H * 0.42, 0.2),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0.25, 0)
+  );
+
+  // Strawberry 02 — centre, slightly low
+  spawnFruitAt('strawberry',
+    new THREE.Vector3(W * 0.12, -H * 0.26, 0.15),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, -0.18, 0)
+  );
+
+  // Tulip 01 — upper right
+  spawnFruitAt('tulip',
+    new THREE.Vector3(W * 0.56, H * 0.72, -0.2),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0.3, 0)
+  );
+
+  // Tulip 02 — right, mid
+  spawnFruitAt('tulip',
+    new THREE.Vector3(W * 0.82, H * 0.10, -0.3),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, -0.22, 0)
+  );
+
+  // Tulip 03 — right, lower
+  spawnFruitAt('tulip',
+    new THREE.Vector3(W * 0.50, -H * 0.52, 0.0),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0.18, 0)
+  );
+}
+
+// ── Raycaster / drag ──────────────────────────────────────────────
+const raycaster   = new THREE.Raycaster();
+const ndcMouse    = new THREE.Vector2();
+const dragPlane   = new THREE.Plane();
+const dragHit     = new THREE.Vector3();
+let   dragBody    = null;
+const dragOffset  = new THREE.Vector3();
+const dragVel     = new THREE.Vector3();
+const dragPrevPos = new THREE.Vector3();
 
 function getNDC(e) {
   const r = canvas.getBoundingClientRect();
-  ndcMouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-  ndcMouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ndcMouse.x =  ((e.clientX - r.left) / r.width)  * 2 - 1;
+  ndcMouse.y = -((e.clientY - r.top)  / r.height) * 2 + 1;
 }
 
 function startDrag(e) {
+  if (currentMode === 'knife') return;
   getNDC(e);
   raycaster.setFromCamera(ndcMouse, camera);
   const meshes = [];
@@ -195,25 +254,27 @@ function startDrag(e) {
   if (!hits.length) return;
 
   const hitMesh = hits[0].object;
-  dragBody = physics.getBodies().find(b => {
+  const entry = bodies.find(en => {
     let found = false;
-    b.group.traverse(c => { if (c === hitMesh) found = true; });
+    en.fruitData.group.traverse(c => { if (c === hitMesh) found = true; });
     return found;
   });
-  if (!dragBody) return;
+  if (!entry) return;
 
+  dragBody = entry.body;
   dragBody.sleeping = true;
   dragBody.velocity.set(0, 0, 0);
   dragBody.angularVel.set(0, 0, 0);
 
-  // Drag plane faces camera at fruit depth
   const normal = new THREE.Vector3().subVectors(camera.position, dragBody.group.position).normalize();
   dragPlane.setFromNormalAndCoplanarPoint(normal, dragBody.group.position);
-
   raycaster.ray.intersectPlane(dragPlane, dragHit);
   dragOffset.subVectors(dragBody.group.position, dragHit);
   dragPrevPos.copy(dragBody.group.position);
   canvas.style.cursor = 'grabbing';
+
+  // Jelly squish on pick-up
+  triggerJellySquish(entry.fruitData, 0.22);
 }
 
 function moveDrag(e) {
@@ -230,173 +291,228 @@ function moveDrag(e) {
 
 function endDrag() {
   if (!dragBody) return;
-  // Release with the velocity we were dragging at
   dragBody.sleeping = false;
-  dragBody.velocity.copy(dragVel).clampLength(0, 18);
+  dragBody.velocity.copy(dragVel).clampLength(0, 16);
   dragBody.angularVel.set(
-    (Math.random() - 0.5) * dragVel.length() * 0.8,
-    (Math.random() - 0.5) * dragVel.length() * 0.8,
-    (Math.random() - 0.5) * dragVel.length() * 0.8
+    (Math.random() - 0.5) * dragVel.length() * 0.9,
+    (Math.random() - 0.5) * dragVel.length() * 0.9,
+    (Math.random() - 0.5) * dragVel.length() * 0.9
   );
+  // Find entry and trigger landing wobble
+  const entry = bodies.find(en => en.body === dragBody);
+  if (entry) triggerJellySquish(entry.fruitData, 0.14);
   dragBody = null;
-  canvas.style.cursor = 'grab';
+  canvas.style.cursor = currentMode === 'knife' ? 'none' : 'grab';
 }
 
-// ── Mode ──────────────────────────────────────────────────────────
-let mode = 'slice';
-const hint = document.getElementById('hint');
-const statusMode = document.getElementById('status-mode');
-const hintMap = {
-  slice: 'Hold & drag to slice fruit • Scroll wheel or Q / E to rotate knife handle',
-  drag: 'Click & drag a fruit — release to throw it',
-  throw: 'Click anywhere to throw the selected fruit',
-  explode: 'Click a fruit to explode it',
-  orbit: 'Drag to rotate the camera • Scroll to zoom',
-};
-const hintColors = {
-  slice: ['rgba(255,77,109,0.08)', 'rgba(255,77,109,0.25)', '#ff4d6d'],
-  drag: ['rgba(168,200,255,0.08)', 'rgba(168,200,255,0.25)', '#a8c8ff'],
-  throw: ['rgba(77,170,255,0.08)', 'rgba(77,170,255,0.25)', '#4daaff'],
-  explode: ['rgba(255,140,66,0.08)', 'rgba(255,140,66,0.25)', '#ff8c42'],
-  orbit: ['rgba(168,200,160,0.08)', 'rgba(168,200,160,0.25)', '#a8c8a0'],
-};
-
-function applyMode(m) {
-  mode = m;
-  if (statusMode) statusMode.textContent = m.toUpperCase();
-  orbit.enabled = (m === 'orbit');
-  slicer.setActive(m === 'slice');
-
-  const [bg, border, color] = hintColors[m] || hintColors.orbit;
-  if (hint) {
-    hint.textContent = hintMap[m] || '';
-    hint.style.background = bg;
-    hint.style.borderColor = border;
-    hint.style.color = color;
-  }
-  canvas.style.cursor =
-    m === 'slice' ? 'none' :   // knife replaces cursor
-      m === 'drag' ? 'grab' :
-        m === 'throw' ? 'cell' :
-          m === 'explode' ? 'pointer' : 'default';
+// ── Jelly wobble ─────────────────────────────────────────────────
+function triggerJellySquish(fruitData, strength) {
+  fruitData.jellyMeshes.forEach(mesh => {
+    const geo = mesh.geometry;
+    if (!geo || !geo.userData.vertVelocity) return;
+    const vv  = geo.userData.vertVelocity;
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      // Kick each vertex outward from centre
+      const nx = pos.getX(i);
+      const ny = pos.getY(i);
+      const nz = pos.getZ(i);
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      vv[i * 3]     += (nx / len) * strength * (0.7 + Math.random() * 0.6);
+      vv[i * 3 + 1] += (ny / len) * strength * (0.7 + Math.random() * 0.6);
+      vv[i * 3 + 2] += (nz / len) * strength * (0.7 + Math.random() * 0.6);
+    }
+  });
 }
 
-document.querySelectorAll('.mode-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    applyMode(btn.dataset.mode);
-  });
-});
-applyMode('slice'); // default
+function triggerShake(strength = 0.3) {
+  for (const entry of bodies) triggerJellySquish(entry.fruitData, strength);
+}
 
-// ── Fruit selector ────────────────────────────────────────────────
-let selectedFruit = 'watermelon';
-document.querySelectorAll('.fruit-btn').forEach(btn => {
+// ── Toolbar actions ───────────────────────────────────────────────
+let currentMode = 'soft'; // soft | hard | knife | scale | view
+
+const knifHintEl = document.getElementById('knife-hint');
+
+document.querySelectorAll('.tb-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.fruit-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedFruit = btn.dataset.fruit;
+    const action = btn.dataset.action;
+
+    // Toggle active on mode buttons
+    if (['hard', 'soft', 'knife', 'scale', 'view'].includes(action)) {
+      document.querySelectorAll('.tb-btn').forEach(b => {
+        if (['hard','soft','knife','scale','view'].includes(b.dataset.action))
+          b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      currentMode = action;
+    }
+
+    switch (action) {
+      case 'hard':
+        jellyAmount = 0.0;
+        slicer.setActive(false);
+        knife.setVisible(false);
+        canvas.style.cursor = 'grab';
+        knifHintEl.classList.remove('visible');
+        break;
+
+      case 'soft':
+        jellyAmount = 0.7;
+        slicer.setActive(false);
+        knife.setVisible(false);
+        canvas.style.cursor = 'grab';
+        knifHintEl.classList.remove('visible');
+        break;
+
+      case 'knife':
+        jellyAmount = 0.7;
+        slicer.setActive(true);
+        canvas.style.cursor = 'none';
+        knifHintEl.classList.add('visible');
+        break;
+
+      case 'scale': {
+        // Random scale pulse on all fruits
+        for (const entry of bodies) {
+          const s = 0.6 + Math.random() * 0.9;
+          entry.fruitData.group.scale.set(s, s, s);
+          triggerJellySquish(entry.fruitData, 0.25);
+        }
+        break;
+      }
+
+      case 'shake':
+        triggerShake(0.35);
+        for (const entry of bodies) {
+          if (entry.body.sleeping) {
+            entry.body.sleeping = false;
+            entry.body.velocity.set(
+              (Math.random() - 0.5) * 3,
+              1.5 + Math.random() * 2,
+              (Math.random() - 0.5) * 3
+            );
+          } else {
+            entry.body.velocity.addScaledVector(
+              new THREE.Vector3((Math.random() - 0.5), 0.5, (Math.random() - 0.5)), 3
+            );
+          }
+        }
+        break;
+
+      case 'reset':
+        if (currentMode === 'knife') {
+          slicer.setActive(false);
+          knife.setVisible(false);
+          canvas.style.cursor = 'grab';
+          knifHintEl.classList.remove('visible');
+        }
+        currentMode = 'soft';
+        jellyAmount = 0.7;
+        document.querySelectorAll('.tb-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('.tb-btn[data-action="soft"]').classList.add('active');
+        clearAll();
+        spawnInitialFruits();
+        break;
+
+      case 'tags':
+        showTags = !showTags;
+        btn.classList.toggle('active', showTags);
+        break;
+
+      case 'view':
+        // Cycle through preset camera angles
+        cycleCameraView();
+        break;
+    }
   });
 });
-document.getElementById('btn-spawn')?.addEventListener('click', () => {
-  spawnFruitAt(
-    selectedFruit,
-    new THREE.Vector3((Math.random() - 0.5) * 1.5, 3.5, 0),
-    new THREE.Vector3((Math.random() - 0.5) * simState.spread, 0.5, 0)
-  );
+
+// Mark "Soft" active on start
+document.querySelector('.tb-btn[data-action="soft"]')?.classList.add('active');
+
+// ── Camera views ──────────────────────────────────────────────────
+const cameraViews = [
+  { pos: new THREE.Vector3(0, 1.2, 11),   target: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(-2, 3.5, 8),   target: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(5, 1.0, 7),    target: new THREE.Vector3(0, 0, 0) },
+  { pos: new THREE.Vector3(0, 6.5, 6),    target: new THREE.Vector3(0, 0, 0) },
+];
+let cameraViewIdx = 0;
+let cameraLerpTarget = null;
+
+function cycleCameraView() {
+  cameraViewIdx = (cameraViewIdx + 1) % cameraViews.length;
+  cameraLerpTarget = cameraViews[cameraViewIdx];
+}
+
+// ── Category filter ───────────────────────────────────────────────
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.dataset.category;
+
+    // Remove current fruits and respawn matching category
+    clearAll();
+
+    const pool = cat === 'all'
+      ? FRUIT_CATALOG
+      : FRUIT_CATALOG.filter(f => f.category === cat);
+
+    if (!pool.length) { spawnInitialFruits(); return; }
+
+    // Place up to 6 fruits centred in visible viewport
+    const count = Math.min(pool.length, 6);
+    const { halfW, halfH } = visibleWidth();
+    const W = halfW * 0.80;
+    const H = halfH * 0.65;
+    // Staggered grid: 3 columns × 2 rows, offset every other column
+    const cols = 3, rows = 2;
+    for (let i = 0; i < count; i++) {
+      const item  = pool[i % pool.length];
+      const col   = i % cols;
+      const row   = Math.floor(i / cols);
+      const ox    = (col / (cols - 1) - 0.5) * 2 * W;
+      const oy    = (row === 0 ? H * 0.35 : -H * 0.35) + (col % 2 === 0 ? 0.18 : -0.18);
+      const pos   = new THREE.Vector3(ox, oy, (Math.random() - 0.5) * 0.3);
+      spawnFruitAt(item.type, pos, new THREE.Vector3(), new THREE.Vector3());
+    }
+  });
 });
 
 // ── Pointer events ────────────────────────────────────────────────
 canvas.addEventListener('pointerdown', e => {
-  if (mode === 'slice') { slicer.onPointerDown(e); return; }
-  if (mode === 'drag') { startDrag(e); return; }
-
-  if (mode === 'throw') {
-    getNDC(e);
-    raycaster.setFromCamera(ndcMouse, camera);
-    const dir = raycaster.ray.direction.clone().multiplyScalar(simState.throwSpeed);
-    dir.x += (Math.random() - 0.5) * simState.spread;
-    dir.z += (Math.random() - 0.5) * simState.spread;
-    const spawnPos = camera.position.clone()
-      .add(raycaster.ray.direction.clone().multiplyScalar(0.8))
-      .add(new THREE.Vector3(0, -0.4, 0));
-    spawnFruitAt(selectedFruit, spawnPos, dir);
-    glowMat.opacity = 0.15;
-    setTimeout(() => { glowMat.opacity = 0.04; }, 400);
-    return;
-  }
-
-  if (mode === 'explode') {
-    getNDC(e);
-    raycaster.setFromCamera(ndcMouse, camera);
-    const meshes = [];
-    physics.getBodies().forEach(b => b.group.traverse(c => { if (c.isMesh) meshes.push(c); }));
-    const hits = raycaster.intersectObjects(meshes, false);
-    if (!hits.length) return;
-    const hitMesh = hits[0].object;
-    const body = physics.getBodies().find(b => {
-      let f = false; b.group.traverse(c => { if (c === hitMesh) f = true; }); return f;
-    });
-    if (!body) return;
-    const pos = body.group.position.clone();
-    slicer.spawnJuice(pos, body.fruitData.juiceColor, 55);
-    scene.remove(body.group);
-    physics.remove(body);
-    addScore(pos);
-    physics.getBodies().forEach(b2 => {
-      const d = b2.group.position.distanceTo(pos);
-      if (d < 3.8) {
-        const f = (3.8 - d) * 4.5;
-        const pd = new THREE.Vector3().subVectors(b2.group.position, pos).normalize();
-        b2.velocity.addScaledVector(pd, f);
-        b2.velocity.y += f * 0.6;
-        b2.angularVel.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
-        b2.sleeping = false;
-      }
-    });
-    return;
-  }
+  if (currentMode === 'knife') { slicer.onPointerDown(e); return; }
+  startDrag(e);
 });
 
 canvas.addEventListener('pointermove', e => {
-  slicer.onPointerMove(e);          // always feed mouse to slicer (drives knife position)
-  if (mode === 'drag') moveDrag(e);
+  slicer.onPointerMove(e);
+  if (currentMode !== 'knife') moveDrag(e);
 });
 
 canvas.addEventListener('pointerup', e => {
   slicer.onPointerUp(e);
-  if (mode === 'drag') endDrag();
+  endDrag();
 });
 
 window.addEventListener('pointerup', e => {
-  if (mode === 'slice') slicer.onPointerUp(e);
-  if (mode === 'drag') endDrag();
+  if (currentMode === 'knife') slicer.onPointerUp(e);
+  endDrag();
 });
 
 canvas.addEventListener('pointerleave', e => {
   slicer.onPointerUp(e);
-  if (mode === 'drag') endDrag();
+  endDrag();
 });
 
-// ── Interactive Wheel & Keyboard Knife Control ────────────────────
+// Knife angle — scroll wheel
 canvas.addEventListener('wheel', e => {
-  if (mode !== 'slice') return;
+  if (currentMode !== 'knife') return;
   e.preventDefault();
-  const delta = Math.sign(e.deltaY) * 0.08;
-  knife.rotateAngle(delta);
+  knife.rotateAngle(Math.sign(e.deltaY) * 0.08);
 }, { passive: false });
-
-window.addEventListener('keydown', e => {
-  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-  const k = e.key.toLowerCase();
-  if (k === 'q' || k === 'e') {
-    const delta = (k === 'q' ? -8 : 8) * Math.PI / 180;
-    knife.rotateAngle(delta);
-  } else if (k === 'r') {
-    knife.setConfig({ baseRotZ: 2.65 });
-  }
-});
 
 // ── Resize ────────────────────────────────────────────────────────
 window.addEventListener('resize', () => {
@@ -412,25 +528,42 @@ const clock = new THREE.Clock();
 // ── Render loop ───────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
-  const dt = clock.getDelta();
+  const dt      = Math.min(clock.getDelta(), 0.05);
   const elapsed = clock.getElapsedTime();
 
-  physics.update(dt, simState.gravity, simState.friction);
-  studio.update(elapsed);
-  slicer.update(dt);   // drives knife position + continuous cut check
-
-  // Combo decay
-  if (comboTimer > 0) {
-    comboTimer -= dt;
-    if (comboTimer <= 0) { combo = 1; if (comboBox) comboBox.classList.remove('show'); }
+  // Camera lerp
+  if (cameraLerpTarget) {
+    camera.position.lerp(cameraLerpTarget.pos, 0.04);
+    if (camera.position.distanceTo(cameraLerpTarget.pos) < 0.01) cameraLerpTarget = null;
+    camera.lookAt(0, 0, 0);
   }
 
-  glowMesh.material.opacity = 0.04 + Math.sin(elapsed * 1.4) * 0.012;
+  // Physics step
+  physics.update(dt, 9.0, 0.97, jellyAmount);
 
-  orbit.update();
+  // Remove fallen / old bodies
+  for (const entry of [...bodies]) {
+    if (entry.body.group.position.y < -6 || entry.body.age > 30) {
+      removeBody(entry);
+    }
+  }
+
+  // Studio update
+  studio.update(elapsed);
+
+  // Slicer / knife
+  slicer.update(dt);
+
+  // Label overlay
+  updateLabels();
+
   renderer.render(scene, camera);
 }
 
 // ── Boot ──────────────────────────────────────────────────────────
 setP(100, 'Ready!');
-setTimeout(() => { hideLoader(); animate(); }, 500);
+setTimeout(() => {
+  hideLoader();
+  spawnInitialFruits();
+  animate();
+}, 500);
